@@ -14,31 +14,32 @@ const name = defaultSettings.title || 'vue Admin Template' // page title
 // You can change the port by the following methods:
 // port = 9528 npm run dev OR npm run dev --port = 9528
 const port = process.env.port || process.env.npm_config_port || 9528 // dev port
+const isProd = process.env.NODE_ENV === 'production' // 判断是否是生产环境
 let cdn = { css: [], js: [] }
 let externals = {}
-const isProd = process.env.NODE_ENV === 'production' // 判断是否是生产环境
 if (isProd) {
-  // 只有生产环境 才有必要 去做排除和cdn的注入
-  externals = {
-    'vue': 'Vue',
-    'element-ui': 'ELEMENT',
-    'xlsx': 'XLSX'
-  }
+  // 只有生产环境才需要进行性能处理
   cdn = {
     css: [
       // element-ui css
-      'https://unpkg.com/element-ui/lib/theme-chalk/index.css' // 样式表
+      'https://cdn.bootcdn.net/ajax/libs/element-ui/2.15.13/theme-chalk/index.min.css' // 样式表
     ],
     js: [
       // vue must at first!
-      'https://unpkg.com/vue/dist/vue.js', // vuejs
+      'https://lf9-cdn-tos.bytecdntp.com/cdn/expire-1-M/vue/2.6.14/vue.min.js', // vuejs
       // element-ui js
-      'https://unpkg.com/element-ui/lib/index.js', // elementUI
+      'https://cdn.bootcdn.net/ajax/libs/element-ui/2.15.13/index.min.js', // elementUI
       'https://cdn.jsdelivr.net/npm/xlsx@0.16.6/dist/jszip.min.js',
       'https://cdn.jsdelivr.net/npm/xlsx@0.16.6/dist/xlsx.full.min.js'
     ]
   }
+  externals = {
+    'vue': 'Vue',
+    'element-ui': 'ELEMENT',
+    'xlsx': 'XLSX'
+  } // 要排除打包的对象
 }
+
 // All configuration item explanations can be find in https://cli.vuejs.org/config/
 module.exports = {
   /**
@@ -54,13 +55,21 @@ module.exports = {
   lintOnSave: process.env.NODE_ENV === 'development',
   productionSourceMap: false,
   devServer: {
-    // 代理配置
-    // 代理跨域的配置
+    // 配置代理属性的信息 什么条件下 代理到哪个服务器
+    // 石涵博 => (接头暗号)代理 => 美国 => 改头换名 博石涵 => 美国不认识  石涵博
     proxy: {
-      // 当我们的本地的请求 有/api的时候，就会代理我们的请求地址向另外一个服务器发出请求
+      // 代理属性
+      // key是请求的前缀
+      // /api/a/b/c => http://www.baidu.com/api/a/b/c  => http://www.baidu.com/a/b/c
+      // /api/sys/login => http://ihrm.itheima.net/api/sys/login
       '/api': {
-        target: 'http://ihrm.itheima.net/', // 跨域请求的地址
-        changeOrigin: true // 只有这个值为true的情况下 才表示开启跨域
+        // target: 'http://localhost:3000', // 要代理的服务器
+        target: 'https://ihrm.itheima.net',
+        changeOrigin: true // 表示确信要跨域
+        // pathRewrite: {
+        //   // 路径重写  有需要的时候才需要写
+        //   '^/api': '' // 假设我们想把 localhost:8888/api/login 变成www.baidu.com/login 就需要这么做
+        // }
       }
     },
     port: port,
@@ -75,15 +84,19 @@ module.exports = {
     // provide the app's title in webpack's name field, so that
     // it can be accessed in index.html to inject the correct title.
     name: name,
+    externals: externals,
     resolve: {
       alias: {
         '@': resolve('src')
       }
-    },
-    // 排除 elementUI xlsx  和 vue
-    externals: externals
+    }
   },
+  // webpack打包执行时触发的链条函数
   chainWebpack(config) {
+    config.plugin('html').tap(args => {
+      args[0].cdn = cdn // 将cdn文件列表给了页面中的一个变量
+      return args
+    })
     // it can improve the speed of the first screen, it is recommended to turn on preload
     config.plugin('preload').tap(() => [{
       rel: 'preload',
@@ -92,13 +105,7 @@ module.exports = {
       fileBlacklist: [/\.map$/, /hot-update\.js$/, /runtime\..*\.js$/],
       include: 'initial'
     }])
-    // 注入cdn变量
-    // 这行代码 会在执行打包的时候 执行 就会将cdn变量注入到html模板中
-    config.plugin('html').tap((args) => {
-      // args是注入html模板的一个变量
-      args[0].cdn = cdn // 后面的cdn就是定义的变量
-      return args // 需要返回这个参数
-    })
+
     // when there are many pages, it will cause too many meaningless requests
     config.plugins.delete('prefetch')
 

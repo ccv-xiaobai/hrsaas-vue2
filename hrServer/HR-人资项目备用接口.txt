@@ -1,0 +1,16 @@
+HR-人资项目接口问题
+
+- 课程视频中的项目接口地址：target:  http://ihrm-java.itheima.net/
+
+- 更换后的接口基础地址：target:  http://ihrm.itheima.net/
+
+
+
+
+
+
+
+
+
+
+
